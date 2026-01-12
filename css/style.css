@@ -1,80 +1,85 @@
-/* 페이지 전체 스타일과 게임 UI 디자인 */
-
 body {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  margin: 0;
-  padding: 20px;
-  gap: 16px;
+    font-family: 'Arial', sans-serif;
+    background-color: #222;
+    color: white;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
 }
 
 h1 {
-  margin: 0;
-  font-size: 24px;
+    margin-top: 20px;
+    font-size: 2rem;
+    color: #ffcc00;
+    text-shadow: 2px 2px 4px #000;
 }
 
-.button-container {
-  display: flex;
-  gap: 10px;
+#canvas-wrapper {
+    position: relative;
+    margin: 20px 0;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    border-radius: 10px;
+    overflow: hidden;
+    background: #000;
+}
+
+canvas {
+    display: block; /* 캔버스 하단 공백 제거 */
+    background-color: #333;
+}
+
+.controls {
+    margin-top: 20px;
+    display: flex;
+    gap: 15px;
 }
 
 button {
-  padding: 10px 20px;
-  font-size: 16px;
-  cursor: pointer;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background-color: #fff;
+    padding: 12px 30px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: transform 0.2s, background-color 0.2s;
 }
 
-button:hover {
-  background-color: #f0f0f0;
+#startBtn {
+    background-color: #28a745;
+    color: white;
 }
 
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+#startBtn:hover {
+    background-color: #218838;
+    transform: scale(1.05);
 }
 
-.canvas-container {
-  position: relative;
-  display: inline-block;
+#startBtn:disabled {
+    background-color: #555;
+    cursor: not-allowed;
+    transform: none;
 }
 
-#canvas {
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  display: block;
+#stopBtn {
+    background-color: #dc3545;
+    color: white;
 }
 
-#max-prediction {
-  position: absolute;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: rgba(0, 0, 0, 0.7);
-  color: white;
-  padding: 8px 16px;
-  border-radius: 4px;
-  font-size: 16px;
-  font-weight: bold;
-  pointer-events: none;
+#stopBtn:hover {
+    background-color: #c82333;
+    transform: scale(1.05);
 }
 
 #label-container {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 200px;
+    margin-top: 10px;
+    display: none; /* 캔버스 HUD로 대체하여 숨김 */
 }
 
-#label-container div {
-  padding: 8px;
-  background-color: #f5f5f5;
-  border-radius: 4px;
-  text-align: center;
+#max-prediction {
+    margin-top: 10px;
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #00d2ff;
 }
