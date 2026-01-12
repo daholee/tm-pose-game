@@ -10,19 +10,27 @@ let ctx;
 let canvas;
 let canvasWidth, canvasHeight;
 let gameTimerId = null; // 1초 단위 타이머 ID
+let currentBasketX = null; // 바구니 스무딩용 좌표
 
 // 이미지 에셋 로드
 const images = {
   apple: new Image(),
   orange: new Image(),
   bomb: new Image(),
-  basket: new Image()
+  basket: new Image(),
+  watermelon: new Image(),
+  hourglass: new Image(),
+  shield: new Image()
 };
 
-images.apple.src = "./images/apple.png";
-images.orange.src = "./images/orange.png";
-images.bomb.src = "./images/bomb.png";
-images.basket.src = "./images/basket.png";
+const v = new Date().getTime();
+images.apple.src = "./images/apple.png?v=" + v;
+images.orange.src = "./images/orange.png?v=" + v;
+images.bomb.src = "./images/bomb.png?v=" + v;
+images.basket.src = "./images/basket.png?v=" + v;
+images.watermelon.src = "./images/watermelon.png?v=" + v;
+images.hourglass.src = "./images/hourglass.png?v=" + v;
+images.shield.src = "./images/shield.png?v=" + v;
 
 // 이미지가 로드되었는지 확인하는 헬퍼
 function isImageLoaded(img) {
@@ -42,8 +50,11 @@ async function init() {
     poseEngine = new PoseEngine("./my_model/");
     const { webcam } = await poseEngine.init({ size: 200, flip: true });
 
+    // 웹캠을 별도 컨테이너에 추가
+    document.getElementById("webcam-container").appendChild(webcam.canvas);
+
     // 2. Stabilizer
-    stabilizer = new PredictionStabilizer({ threshold: 0.6, smoothingFrames: 5 });
+    stabilizer = new PredictionStabilizer({ threshold: 0.6, smoothingFrames: 2 });
 
     // 3. GameEngine
     gameEngine = new GameEngine();
@@ -52,7 +63,7 @@ async function init() {
     canvas = document.getElementById("canvas");
     // 반응형 크기 조정을 위해 CSS 크기에 맞춤 (또는 고정 크기)
     canvas.width = 600;
-    canvas.height = 600;
+    canvas.height = 1575; // 900 * 1.75
     ctx = canvas.getContext("2d");
 
     canvasWidth = canvas.width;
@@ -158,14 +169,8 @@ function renderLoop() {
   // 1. 배경 클리어
   ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
-  // 2. 웹캠 배경 그리기 (흐릿하게)
-  if (poseEngine && poseEngine.webcam && poseEngine.webcam.canvas) {
-    ctx.save();
-    ctx.globalAlpha = 0.3; // 반투명
-    // 웹캠 원본 비율 유지하며 꽉 채우기
-    ctx.drawImage(poseEngine.webcam.canvas, 0, 0, canvasWidth, canvasHeight);
-    ctx.restore();
-  }
+  // 2. 웹캠 배경 그리기 (제거함) - 이제 별도 창에서 확인
+  // if (poseEngine && poseEngine.webcam && poseEngine.webcam.canvas) { ... }
 
   // 3. 게임 라인 그리기
   const laneWidth = canvasWidth / 3;
@@ -181,11 +186,15 @@ function renderLoop() {
   // 4. 게임 요소 그리기 (게임 중일 때만)
   if (gameEngine && gameEngine.isGameActive) {
 
-    // (1) 플레이어 (바구니)
-    const playerX = gameEngine.playerLane * laneWidth + (laneWidth / 2);
+    // (1) 플레이어 (바구니) - 부드러운 이동 (Lerp 적용)
+    const targetX = gameEngine.playerLane * laneWidth + (laneWidth / 2);
+
+    // 초기화 안됐으면 바로 이동, 아니면 항상 부드럽게 이동 (Teleport 방지)
+    currentBasketX = targetX;
+
     const playerY = canvasHeight * 0.85; // 바닥에서 조금 위
 
-    drawBasket(playerX, playerY);
+    drawBasket(currentBasketX, playerY);
 
     // (2) 떨어지는 아이템들
     gameEngine.items.forEach(item => {
@@ -211,6 +220,21 @@ function renderLoop() {
 
 function drawBasket(x, y) {
   const size = 120; // 바구니 크기
+
+  // 방패 효과 (무적) 시각화
+  if (gameEngine && gameEngine.effectInvincible) {
+    // 맥동 효과 (시간에 따라 크기/투명도 변화주면 좋지만 간단하게 처리)
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, size * 0.7, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(0, 191, 255, 0.3)"; // 반투명 푸른색
+    ctx.fill();
+    ctx.strokeStyle = "rgba(135, 206, 250, 0.8)"; // 밝은 하늘색 테두리
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.restore();
+  }
+
   if (isImageLoaded(images.basket)) {
     ctx.drawImage(images.basket, x - size / 2, y - size / 2, size, size);
   } else {
@@ -235,6 +259,18 @@ function drawItem(type, x, y) {
   if (type === 'bomb') {
     img = images.bomb;
     icon = "💣";
+  }
+  if (type === 'watermelon') {
+    img = images.watermelon;
+    icon = "🍉";
+  }
+  if (type === 'hourglass') {
+    img = images.hourglass;
+    icon = "⏳";
+  }
+  if (type === 'shield') {
+    img = images.shield;
+    icon = "🛡️";
   }
 
   if (isImageLoaded(img)) {

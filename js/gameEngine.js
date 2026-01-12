@@ -15,7 +15,7 @@ class GameEngine {
     this.playerLane = 1; // 0: Left, 1: Center, 2: Right
     this.lastSpawnTime = 0;
     this.spawnInterval = 1000; // 아이템 생성 간격 (ms)
-    this.baseSpeed = 1.8; // 기본 낙하 속도 (60% 수준으로 감소)
+    this.baseSpeed = 0.54; // 기본 낙하 속도 (1.08 -> 0.54로 50% 감소)
 
     // 라인 설정 (3개)
     this.lanes = [0, 1, 2];
@@ -27,6 +27,15 @@ class GameEngine {
     // 내부 루프용
     this.animationFrameId = null;
     this.lastFrameTime = 0;
+
+    // 아이템 효과 상태
+    this.effectFrenzy = false; // 수박 화채 (폭주)
+    this.effectSlow = false;   // 모래시계 (느려짐)
+    this.effectInvincible = false; // 방패 (무적)
+
+    this.frenzyEndTime = 0;
+    this.slowEndTime = 0;
+    this.invincibleEndTime = 0;
   }
 
   start() {
@@ -44,8 +53,12 @@ class GameEngine {
     this.timeLeft = 60;
     this.items = [];
     this.playerLane = 1;
-    this.baseSpeed = 3;
+    this.baseSpeed = 0.54;
     this.spawnInterval = 1000;
+
+    this.effectFrenzy = false;
+    this.effectSlow = false;
+    this.effectInvincible = false;
 
     // 점수 초기화 알림
     if (this.onScoreChange) this.onScoreChange(this.score, this.level, this.timeLeft);
@@ -111,11 +124,25 @@ class GameEngine {
     }
 
     if (this.onScoreChange) this.onScoreChange(this.score, this.level, this.timeLeft);
+
+    // 아이템 효과 만료 체크
+    const now = Date.now();
+    if (this.effectFrenzy && now > this.frenzyEndTime) {
+      this.effectFrenzy = false;
+      this.spawnInterval = 1000 - ((this.level - 1) * 200); // 원래대로 복구 (대략적)
+      if (this.spawnInterval < 400) this.spawnInterval = 400;
+    }
+    if (this.effectSlow && now > this.slowEndTime) {
+      this.effectSlow = false;
+    }
+    if (this.effectInvincible && now > this.invincibleEndTime) {
+      this.effectInvincible = false;
+    }
   }
 
   levelUp() {
     this.level++;
-    this.baseSpeed += 0.9; // 속도 증가 (조정됨)
+    this.baseSpeed *= 1.05; // 속도 5% 증가
     this.spawnInterval -= 200; // 생성 간격 감소
     if (this.spawnInterval < 400) this.spawnInterval = 400;
   }
@@ -124,15 +151,35 @@ class GameEngine {
     const lane = Math.floor(Math.random() * 3); // 0, 1, 2 중 랜덤
     const typeRand = Math.random();
 
-    let type = 'apple'; // 60%
+    let type = 'apple'; // 기본
     let score = 100;
+    let isSpecial = false;
 
-    if (typeRand > 0.9) { // 10%
+    // 확률 조정 (합 1.0)
+    // 수박(3%), 모래시계(3%), 방패(3%), 폭탄(10%), 오렌지(20%), 사과(61%)
+    if (typeRand > 0.97) {
+      type = 'watermelon';
+      score = 0;
+      isSpecial = true;
+    } else if (typeRand > 0.94) {
+      type = 'hourglass';
+      score = 0;
+      isSpecial = true;
+    } else if (typeRand > 0.91) {
+      type = 'shield';
+      score = 0;
+      isSpecial = true;
+    } else if (typeRand > 0.81) {
       type = 'bomb';
       score = 0;
-    } else if (typeRand > 0.7) { // 20%
+    } else if (typeRand > 0.61) {
       type = 'orange';
       score = 200;
+    }
+
+    // Frenzy 상태면 아이템 스폰 간격 극도로 감소
+    if (this.effectFrenzy) {
+      this.spawnInterval = 100; // 0.1초마다
     }
 
     this.items.push({
@@ -141,13 +188,19 @@ class GameEngine {
       y: -100, // 화면 위에서 시작
       type: type,
       score: score,
-      speed: this.baseSpeed + Math.random() // 약간의 속도 차이
+      // 특수 아이템은 50% 속도, 나머지는 baseSpeed
+      speed: isSpecial ? this.baseSpeed * 0.5 : this.baseSpeed
     });
   }
 
   updateItems(deltaTime) {
     // 속도 보정 (deltaTime은 ms 단위이므로, 60fps 기준 비율 맞춰줌)
-    const timeScale = deltaTime / 16.66;
+    let timeScale = deltaTime / 16.66;
+
+    // 모래시계 효과 중이면 시간 느리게
+    if (this.effectSlow) {
+      timeScale *= 0.5;
+    }
 
     for (let i = this.items.length - 1; i >= 0; i--) {
       const item = this.items[i];
@@ -178,9 +231,26 @@ class GameEngine {
 
   handleCollision(item) {
     if (item.type === 'bomb') {
+      // 무적 상태면 폭탄 무시
+      if (this.effectInvincible) {
+        return;
+      }
       // 폭탄 -> 게임오버
       this.timeLeft = 0;
       this.stop();
+    } else if (item.type === 'watermelon') {
+      // 수박 화채: 10초간 과일 폭주
+      this.effectFrenzy = true;
+      this.frenzyEndTime = Date.now() + 10000;
+      this.spawnItem(); // 즉시 하나 생성
+    } else if (item.type === 'hourglass') {
+      // 모래시계: 10초간 슬로우 모션
+      this.effectSlow = true;
+      this.slowEndTime = Date.now() + 10000;
+    } else if (item.type === 'shield') {
+      // 방패: 15초간 무적
+      this.effectInvincible = true;
+      this.invincibleEndTime = Date.now() + 15000;
     } else {
       // 과일 -> 점수 획득
       this.score += item.score;
